@@ -41,7 +41,7 @@ Send `access-token`, `client`, and `uid` as separate headers on every authentica
 }
 ```
 
-Passwords must be 8–128 characters. `password_confirmation`, if supplied, must match. Email must be valid and unique (case normalized). Successful response is 200 with auth headers:
+Passwords must be 8–72 characters and **at most 72 UTF-8 bytes**. Both limits apply: 18 four-byte emoji occupy 72 bytes; 19 exceed the byte limit even though there are only 19 characters. Registration rejects longer passwords with 422 using the existing registration `errors.password` / `errors.full_messages` format. The frontend must count encoded bytes (for example, `new TextEncoder().encode(password).length`) and display server validation errors. `password_confirmation`, if supplied, must match. Email must be valid and unique (case normalized). Successful response is 200 with auth headers:
 
 ```json
 {"status":"success","data":{"id":1,"email":"dancer@example.test"}}
@@ -63,7 +63,7 @@ Registration creates only an account. The frontend must next create a profile. E
 {"data":{"id":1,"email":"dancer@example.test"}}
 ```
 
-Invalid credentials: 401.
+Invalid credentials: 401. Login inputs exceeding 72 UTF-8 bytes are also rejected with the existing invalid-credentials 401 response; password suffixes are never silently ignored.
 
 ### Current account
 
@@ -84,6 +84,8 @@ Missing, invalid, revoked or expired token: 401. Only this account's ID and emai
 ```
 
 Missing/invalid session: 404 with `{"success":false,"errors":["User was not found or was not logged in."]}` (library behavior).
+
+Logout reloads and revokes the active client under a user-row lock. Concurrent logouts for different clients both revoke their sessions without restoring each other's tokens; unrelated clients remain signed in. URLs, authentication headers, and response formats are unchanged.
 
 ## Own profile
 

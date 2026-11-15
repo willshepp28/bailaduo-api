@@ -6,7 +6,7 @@ Rails.application.routes.draw do
     scope '/api/auth', defaults: { format: :json } do
       post '/', to: 'devise_token_auth/registrations#create'
       post '/sign_in', to: 'devise_token_auth/sessions#create'
-      delete '/sign_out', to: 'devise_token_auth/sessions#destroy'
+      delete '/sign_out', to: 'api/sessions#destroy'
       get '/validate_token', to: 'devise_token_auth/token_validations#validate_token'
     end
   end
