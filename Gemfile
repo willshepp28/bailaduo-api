@@ -28,6 +28,9 @@ gem "tzinfo-data", platforms: %i[ windows jruby ]
 
 # Reduces boot times through caching; required in config/boot.rb
 gem "bootsnap", require: false
+gem "devise", "~> 4.9"
+gem "devise_token_auth", "~> 1.2"
+gem "rack-cors", "~> 2.0"
 
 # Use Active Storage variants [https://guides.rubyonrails.org/active_storage_overview.html#transforming-images]
 # gem "image_processing", "~> 1.2"
@@ -36,6 +39,8 @@ gem "bootsnap", require: false
 # gem "rack-cors"
 
 group :development, :test do
+  # Rails 7.1's test runner uses the Minitest 5 API.
+  gem "minitest", "~> 5.0"
   # See https://guides.rubyonrails.org/debugging_rails_applications.html#debugging-with-the-debug-gem
   gem "debug", platforms: %i[ mri windows ]
 end
