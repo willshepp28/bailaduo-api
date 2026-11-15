@@ -1,8 +1,8 @@
 # BailaDuo — Product Specification
 
-**Version:** 0.1  
-**Status:** Design-ready working specification  
-**Date:** November 15, 2026  
+**Version:** 0.1\
+**Status:** Design-ready working specification\
+**Date:** November 15, 2026\
 **Purpose:** Define the MVP user experience for a high-fidelity, clickable mobile-first prototype, then guide implementation. This document distinguishes confirmed product decisions from proposed scope cuts and unresolved implementation details.
 
 ## 1. Product overview
