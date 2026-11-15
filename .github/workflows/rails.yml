@@ -1,0 +1,54 @@
+name: Rails CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rails:
+    name: Rails / PostgreSQL
+    # Ruby 3.2.2 has prebuilt binaries for this runner image.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_DB: bailaduo_api_ci_test
+          # Ephemeral CI service only; no production credentials are used.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bailaduo_api_ci_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      RAILS_ENV: test
+      DATABASE_URL: postgresql://postgres@localhost:5432/bailaduo_api_ci_test
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: Apply migrations to isolated PostgreSQL
+        run: bin/rails db:migrate
+      - name: Run full suite including concurrency checks
+        run: bin/rails test
+      - name: Check production autoloading
+        env:
+          RAILS_ENV: production
+          SECRET_KEY_BASE_DUMMY: '1'
+          FRONTEND_ORIGINS: https://frontend.example.test
+        run: bin/rails zeitwerk:check
