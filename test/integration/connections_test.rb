@@ -67,6 +67,38 @@ class ConnectionsTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, '@example.test'
   end
 
+  test 'profile edits accepted relationship and message history survive logout and fresh login' do
+    password = SecureRandom.hex(16)
+    @alice.update!(password: password)
+    accept_connection
+    patch '/api/profile', params: { profile: { bio: 'Practice on Sundays' } }, headers: @alice_headers, as: :json
+    assert_response :ok
+    post "/api/connections/#{@connection.id}/messages", params: { message: { body: 'Saved before logout' } }, headers: @alice_headers, as: :json
+    assert_response :created
+    message_id = response.parsed_body.dig('data', 'id')
+    delete '/api/auth/sign_out', headers: @alice_headers
+    assert_response :ok
+    get "/api/connections/#{@connection.id}/messages", headers: @alice_headers
+    assert_response :unauthorized
+
+    post '/api/auth/sign_in', params: { email: @alice.email, password: password }, as: :json
+    assert_response :ok
+    fresh_headers = response.headers.slice('access-token', 'client', 'uid')
+    get '/api/profile', headers: fresh_headers
+    assert_response :ok
+    assert_equal 'Practice on Sundays', response.parsed_body.dig('data', 'bio')
+    get '/api/connections/relationship', params: { profile_id: @bob.profile.id }, headers: fresh_headers
+    assert_response :ok
+    assert_equal 'accepted', response.parsed_body.dig('data', 'state')
+    get "/api/connections/#{@connection.id}/messages", headers: fresh_headers
+    assert_response :ok
+    assert_equal [message_id], response.parsed_body['data'].pluck('id')
+    assert_equal ['Saved before logout'], response.parsed_body['data'].pluck('body')
+    get "/api/connections/#{@connection.id}/messages", headers: @bob_headers
+    assert_response :ok
+    assert_equal [message_id], response.parsed_body['data'].pluck('id')
+  end
+
   test 'only recipient can accept or decline and terminal states cannot reopen' do
     request_connection
     %w[accepted declined].each do |target|

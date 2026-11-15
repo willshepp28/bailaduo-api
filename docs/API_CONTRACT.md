@@ -455,3 +455,9 @@ RAILS_ENV=production SECRET_KEY_BASE_DUMMY=1 FRONTEND_ORIGINS=https://frontend.e
 ```
 
 The last command checks production autoloading with a dummy build secret and fictional CORS origin; it is not a deployment. Production continues to require the real exact frontend origins and existing Render/Neon credentials. API-002 requires no additional gems or environment variables.
+
+## Automated verification and launch tracking
+
+The `Rails CI` GitHub Actions workflow runs on pull requests, pushes to `main`, and manual dispatch. Its `Rails / PostgreSQL` job uses Ruby from `.ruby-version`, the locked bundle, and an ephemeral PostgreSQL 16 test database. It runs migrations, the full Rails suite (including authorization, concurrent requests/transitions, and logout/login persistence), and production autoloading with a dummy build secret. CI does not use Neon, deploy, or require production secrets.
+
+Launch status and browser/deployment evidence belong in [launch issue #5](https://github.com/willshepp28/bailaduo-api/issues/5) and its linked tickets. Passing backend tests does not establish React browser integration or production readiness. The pilot uses externally hosted HTTPS photo URLs; uploads, extra galleries, videos, scheduling, and real-time messaging remain deferred.
