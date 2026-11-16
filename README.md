@@ -21,6 +21,20 @@ git diff --check
 
 GitHub Actions runs migrations, the full suite and production autoload on isolated PostgreSQL. Tests use generated credentials and provider doubles; they do not establish real Cloudflare or deployed/browser readiness.
 
+## Local Playa test accounts
+
+Opt in explicitly; this is never part of `db:prepare` or production seeds:
+
+```sh
+RAILS_ENV=development DATABASE_URL=postgresql:///bailaduo_api_integration_development bin/rails dev:seed_playa
+```
+
+Creates 15 fictional adult dancers (`playa01@bailaduo.test`–`playa15@bailaduo.test`) in Playa del Carmen, with bachata throughout and 6 beginner / 6 intermediate / 3 advanced profiles. HTTPS numbered placeholder PNGs are development fixtures, **not verified Cloudflare uploads**. No provider calls, photo-rule/flag changes, connections or messages are made by seeding. These fixtures remain supported as existing legacy photos; replacement follows the normal owned-upload API.
+
+The task checks both resolved Rails configuration and the actual PostgreSQL connection: only Rails development, the exact local database above, and port 5432 are allowed. It preserves unrelated data and existing cohort edits/passwords/relationships. Reruns create only missing owned accounts/profiles and retain IDs otherwise. An email collision without matching ownership is refused.
+
+Generated passwords and cohort ownership live only in git-ignored `tmp/playa-test-users.json` (mode 0600). Back it up privately; do not paste it into GitHub, logs, screenshots or traces. Missing/corrupt manifests or identity collisions require restoring the private manifest or deliberate review; the task never resets passwords or guesses credentials. Passwords manually changed later are not overwritten, so exported credentials must be rechecked through real sign-in before handoff. A rare interrupted database commit may leave a manifest needing review; no automatic adoption/reset is attempted. Local API: `http://localhost:3100`; frontend: `http://localhost:5174` when running in live mode. Execution/test evidence belongs to epic #9 and launch issue #5.
+
 ## Profile-photo configuration
 
 Keep all credentials in the Rails environment. No `VITE_*` Cloudflare secrets, shared JabNGo token, account-wide cleanup, or changes to existing variants/assets. Create a dedicated BailaDuo Images token with Images read/edit permissions for the intended account, and a new delivery variant such as `bailaduodevelopmentprofile` (800×800, fit crop, no upscaling, metadata none). Cloudflare Images tokens are account-scoped; Rails ownership/environment checks provide asset isolation, not metadata or token naming.
