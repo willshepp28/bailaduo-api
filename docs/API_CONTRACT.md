@@ -1,4 +1,4 @@
-# BailaDuo API — API-001 and API-002
+# BailaDuo API — API-001, API-002 and API-003
 
 Implemented in Rails 7.1 with Devise 4.9 and Devise Token Auth 1.3. All paths below are relative to the API host. Send `Content-Type: application/json` and `Accept: application/json`. IDs are numeric. Example account details and image URLs are fictional; password and token placeholders must be replaced at runtime.
 
@@ -114,7 +114,7 @@ Required fields: all above except `bio`. Validation:
 - `experience_level`: `beginner`, `intermediate`, or `advanced`; trimmed and lowercased.
 - `availability`: nonblank free text, at most 500 characters.
 - `bio`: optional text, at most 2,000 characters; can be cleared with null or an empty string.
-- `primary_photo_url`: HTTPS URL, at most 2,048 characters. This is a reference to an externally hosted image; no uploading or remote image fetching is performed.
+- `primary_photo_url`: public HTTPS response field, at most 2,048 characters. API-003 accepts a verified owned `photo_upload_id` to derive this URL. Legacy URL input is temporary rollout compatibility; see API-003 below.
 
 Text fields are trimmed. Incomplete profiles cannot be saved; an account without a profile is considered not onboarded. An invalid update leaves the existing profile unchanged. Discovery and public lookup additionally exclude incomplete imported/legacy rows.
 
@@ -242,7 +242,7 @@ For Render, keep the existing Neon `DATABASE_URL`, Rails secret/master-key setti
 
 Set `FRONTEND_ORIGINS` on Render to comma-separated exact frontend origins, e.g. `https://your-app.netlify.app,https://your-custom-domain.example`. No paths, trailing slash, wildcards or credentials. Empty production configuration permits no cross-origin frontend access. Restart after changes. Development defaults to `http://localhost:5173,http://localhost:3000`; override for other ports. Netlify preview origins must be explicitly listed. CORS exposes auth response headers and allows GET, POST, PATCH, DELETE, HEAD and OPTIONS under `/api/*`; credentials/cookies are not enabled.
 
-Authentication configuration choices: stable two-week tokens simplify React request handling; logout still revokes the active client in PostgreSQL. `bypass_sign_in = false` keeps authentication stateless in this Rails API-only app. API-002 connection and messaging endpoints are documented below. Upload endpoints remain outside scope.
+Authentication configuration choices: stable two-week tokens simplify React request handling; logout still revokes the active client in PostgreSQL. `bypass_sign_in = false` keeps authentication stateless in this Rails API-only app. API-002 connection and messaging endpoints are documented below. API-003 photo uploads are documented below.
 
 ## API-002: connections and persistent text messages
 
@@ -462,4 +462,116 @@ The last command checks production autoloading with a dummy build secret and fic
 
 The `Rails CI` GitHub Actions workflow runs on pull requests, pushes to `main`, and manual dispatch. Its `Rails / PostgreSQL` job uses Ruby from `.ruby-version`, the locked bundle, and an ephemeral PostgreSQL 16 test database. It runs migrations, the full Rails suite (including authorization, concurrent requests/transitions, and logout/login persistence), and production autoloading with a dummy build secret. CI does not use Neon, deploy, or require production secrets.
 
-Launch status and browser/deployment evidence belong in [launch issue #5](https://github.com/willshepp28/bailaduo-api/issues/5) and its linked tickets. Passing backend tests does not establish React browser integration or production readiness. The pilot uses externally hosted HTTPS photo URLs; uploads, extra galleries, videos, scheduling, and real-time messaging remain deferred.
+Launch status and browser/deployment evidence belong in [launch issue #5](https://github.com/willshepp28/bailaduo-api/issues/5) and its linked tickets. Passing backend tests does not establish React browser integration or production readiness. One owned Cloudflare Images primary-photo upload is required for launch through API-003/WEB-003. Extra galleries, videos, scheduling, and real-time messaging remain deferred.
+
+## API-003: owned primary-photo uploads
+
+All photo endpoints require existing Devise Token Auth headers. **A completed profile is not required**, so signup can proceed to photo upload during onboarding. No provider credentials are exposed to the browser. The existing `primary_photo_url` public response field and API-001/API-002 authentication remain unchanged.
+
+### Endpoints and flow
+
+| Method | URL | Success | Behavior |
+| --- | --- | --- | --- |
+| POST | `/api/photo_uploads` | 201 | Issue one short-lived upload authorization |
+| GET | `/api/photo_uploads/:id` | 200 | Read your upload's current stored status; does not call Cloudflare |
+| POST | `/api/photo_uploads/:id/complete` | 200 | Ask Rails to verify actual provider completion, format and size |
+| DELETE | `/api/photo_uploads/:id` | 200 | Cancel/delete your unreferenced upload; never deletes a referenced photo |
+
+1. Request authorization with declared file MIME/size (JSON number, not a string):
+
+```json
+{"photo_upload":{"content_type":"image/png","byte_size":12345}}
+```
+
+Only `image/jpeg`, `image/png`, `image/webp` and sizes 1–5,000,000 are accepted. Declarations are checked at issuance, but never establish validity/ownership. Cloudflare enforces its hosted-image constraints (including a 10 MB hard ceiling); Rails streams the provider's original under a 5 MB cap and checks its file signature before allowing attachment. Bypassing browser checks cannot attach oversized/unsupported content. No image binaries are stored in the database or application filesystem.
+
+201 example (authorization is returned **once**, not stored or returned by GET):
+
+```json
+{
+  "data": {
+    "id": 21,
+    "status": "pending",
+    "expires_at": "2026-11-16T14:10:00.000Z",
+    "claim_expires_at": "2026-11-17T14:10:00.000Z",
+    "primary_photo_url": null,
+    "content_type": null,
+    "byte_size": null,
+    "upload_url": "<one-time HTTPS URL returned by Cloudflare>"
+  },
+  "limits": {"max_bytes":5000000,"content_types":["image/jpeg","image/png","image/webp"]}
+}
+```
+
+2. POST a multipart `file` directly to `upload_url`. **Do not send Rails authentication headers or the Cloudflare API token to that host.** Use the returned URL exactly; do not construct it. Do not log/store/share it in GitHub, telemetry or persistent browser storage. The upload authorization expires after 10 minutes and is single-use. Retry by obtaining a new authorization, not by inventing an image ID.
+3. Call `POST /api/photo_uploads/21/complete` with auth headers and no body. Rails checks the owned database record, intended account/app/environment, Cloudflare draft/completion status, configured BailaDuo variant, and actual original bytes. A client-asserted upload success, provider ID, delivery URL or metadata is not proof. Pending provider processing returns 409 and can be retried until expiry.
+
+200 confirmation example:
+
+```json
+{
+  "data": {
+    "id":21,
+    "status":"ready",
+    "expires_at":"2026-11-16T14:10:00.000Z",
+    "claim_expires_at":"2026-11-17T14:10:00.000Z",
+    "primary_photo_url":"https://imagedelivery.net/<configured-account-hash>/<server-issued-image-id>/bailaduo-development-profile",
+    "content_type":"image/png",
+    "byte_size":12345
+  }
+}
+```
+
+`GET` returns this shape without `upload_url`/`limits`, reflecting the current stored status. Completion is idempotent for ready/attached photos. Pending uploads cannot be confirmed after `expires_at`; verified, unattached photos must be selected before `claim_expires_at`. Attached photos remain valid after both timestamps.
+
+4. Submit the returned **Rails photo-upload record ID** as `profile.photo_upload_id` with the existing profile creation/update endpoint. For onboarding:
+
+```json
+{
+  "profile": {
+    "display_name":"Alex",
+    "age":28,
+    "city":"Playa del Carmen",
+    "dance_styles":["bachata"],
+    "experience_level":"beginner",
+    "availability":"Weekends",
+    "photo_upload_id":21
+  }
+}
+```
+
+Replacement: `PATCH /api/profile` with `{"profile":{"photo_upload_id":22}}`. A valid integer/string ID is required, never a Cloudflare image ID. Server ownership/environment lookup is enforced even if the upload ID is known. Profile save also verifies a pending upload if completion was not called separately; using the explicit completion endpoint gives the frontend clearer upload/error states.
+
+Rails derives `primary_photo_url` from the verified record, ignoring any simultaneously supplied URL. Successful profile responses keep the exact existing public profile shape; internal upload/provider IDs are not added to public profiles. Upload state becomes `attached`. Update other profile fields as before; omit `photo_upload_id` to retain the photo. Failed verification or profile validation rolls back the attachment and leaves the previous profile/photo intact.
+
+### Ownership, states, quotas and cleanup
+
+Upload states are `issuing` → `pending` → `ready` → `attached`. Issuance failures leave `failed` owned records for safe cleanup. A replaced photo becomes `superseded`; deletion results in `deleted`. Provider errors do not create simulated completion. All upload responses use `Cache-Control: no-store`.
+
+The server generates and records provider IDs, ownership, app, environment and account identity before contacting Cloudflare. Every provider operation checks that record; client-supplied IDs/metadata cannot claim another asset. Foreign-user/app/environment/account references return 404. Unrelated/invalid provider IDs are refused before network access. The implementation never lists account assets or changes variants, signing keys or JabNGo settings.
+
+Per user: at most **5 authorizations/hour**, **20/day**, and **3 active issuing/pending/ready slots** before upload expiry. Failed/deleted requests still count toward hourly/daily issuance totals. User-row locking prevents concurrent quota bypass. Quotas are fixed for this release. A full quota returns 429, `Retry-After: 3600` and `code: "upload_quota_exceeded"`. Cancel unused records through DELETE; cancellation does not reset issuance quotas.
+
+DELETE verifies ownership, rejects any current profile reference with 409, and returns the owner-data shape with `status: "deleted"` and `primary_photo_url: null`. Repeated deletion is idempotent. No profile deletion endpoint is added. Replacement cleanup runs only after a successful committed profile change. Provider failures leave superseded records for the bounded `photos:cleanup` task; they do not roll back the new profile or delete the previous photo before success. Cleanup waits 24 hours after expiry for abandoned uploads and acts only on unreferenced, known BailaDuo records for the configured environment/account, at most 50 per invocation. Imported URL references are also protected. See README for operator setup and the opt-in real-provider smoke check.
+
+### Error behavior
+
+Photo/profile-upload errors use `{"errors":["message"]}`; ordinary profile validation retains `errors` plus `fields`. Relevant statuses:
+
+- 400: missing/non-object `photo_upload` payload or malformed `photo_upload_id`.
+- 401: existing Devise Token Auth format; no profile-completion gate on upload endpoints.
+- 404: missing upload, foreign ownership/app/environment/account.
+- 409: provider upload not complete yet, or attempted deletion of a referenced photo.
+- 410: pending authorization expired or unattached verified photo's claim window expired; choose/re-upload the file.
+- 422: unsupported/oversized declared or actual file, unusable/deleted/failed record, unverified photo reference, or invalid profile fields.
+- 429: quota exceeded, e.g. `{"errors":["Photo upload limit reached; cancel unused uploads or try again later"],"code":"upload_quota_exceeded"}`.
+- 502: provider request/verification/deletion failure; sanitized retry message, no provider body/secret URL.
+- 503: BailaDuo Images configuration missing/invalid. Do not fall back to demo data or invent success.
+
+### Rollout compatibility
+
+`BAILADUO_REQUIRE_MANAGED_PHOTOS` defaults to false/unset during coordinated rollout. This temporarily allows existing URL-only clients to create/edit legacy HTTPS photos. New/changed raw Cloudflare delivery URLs are rejected even in this mode: they are not owned upload references. A managed photo can never be replaced by a pasted URL.
+
+Once WEB-003 is verified/deployed, set the flag exactly `true`: new profiles and photo replacements require `photo_upload_id`. Existing legacy photos remain visible; unchanged photo URLs and non-photo edits remain supported. Do not infer/backfill ownership from existing URLs. Deploy the additive backend migration/configuration first, integrate the frontend, then enable enforcement; see README. Auth endpoints, discovery, public profiles and connections continue using their existing contracts. Real Cloudflare credentials, a new BailaDuo delivery variant and the real-provider smoke check are prerequisites for claiming photo release readiness.
+
+Provider references: [Direct creator uploads](https://developers.cloudflare.com/images/storage/upload-images/direct-creator-upload/), [hosted image limits/formats](https://developers.cloudflare.com/images/get-started/limits/). Metadata/names are organizational only; Images permissions remain account-scoped.

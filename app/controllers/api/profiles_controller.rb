@@ -37,19 +37,25 @@ module Api
     end
 
     def create
-      if current_user.profile
-        return render json: { errors: ['Profile already exists'] }, status: :conflict
+      current_user.with_lock do
+        if current_user.profile
+          return render json: { errors: ['Profile already exists'] }, status: :conflict
+        end
+        input = profile_params
+        profile = current_user.build_profile(input.except(:photo_upload_id))
+        persist(profile, :created, input[:photo_upload_id])
       end
-      profile = current_user.build_profile(profile_params)
-      persist(profile, :created)
     rescue ActiveRecord::RecordNotUnique
       render json: { errors: ['Profile already exists'] }, status: :conflict
     end
 
     def update
-      profile = own_profile
-      profile.assign_attributes(profile_params)
-      persist(profile, :ok)
+      current_user.with_lock do
+        profile = own_profile
+        input = profile_params
+        profile.assign_attributes(input.except(:photo_upload_id))
+        persist(profile, :ok, input[:photo_upload_id])
+      end
     end
 
     private
@@ -63,14 +69,42 @@ module Api
       unless attributes.is_a?(ActionController::Parameters)
         raise ActionController::BadRequest, 'profile must be an object'
       end
-      attributes.permit(:display_name, :age, :city, :experience_level, :availability, :bio, :primary_photo_url, dance_styles: [])
+      attributes.permit(:display_name, :age, :city, :experience_level, :availability, :bio, :primary_photo_url, :photo_upload_id, dance_styles: [])
     end
 
-    def persist(profile, status)
-      if profile.save
-        render json: { data: profile.public_data }, status: status
+    def persist(profile, status, upload_id)
+      if upload_id.present?
+        unless upload_id.to_s.match?(/\A[1-9]\d{0,17}\z/)
+          raise ActionController::BadRequest, 'photo_upload_id must be a positive integer'
+        end
+        provider = CloudflareImages.new
+        upload = current_user.photo_uploads.where(app: 'bailaduo', environment: provider.environment,
+                                                  provider_account_id: provider.account_id).find(upload_id)
+        upload.with_lock do
+          upload.verify!(provider: provider)
+          profile.primary_photo_upload = upload
+          profile.primary_photo_url = upload.delivery_url
+          profile.save!
+          upload.update!(status: 'attached')
+        end
       else
-        render json: { errors: profile.errors.full_messages, fields: profile.errors.to_hash }, status: :unprocessable_entity
+        validate_photo_rollout!(profile)
+        profile.save!
+      end
+      render json: { data: profile.public_data }, status: status
+    end
+
+    def validate_photo_rollout!(profile)
+      url_changed = profile.new_record? || profile.will_save_change_to_primary_photo_url?
+      return unless url_changed
+      host = begin
+        URI.parse(profile.primary_photo_url.to_s).host.to_s.downcase
+      rescue URI::InvalidURIError
+        '' # Normal profile URL validation reports invalid input.
+      end
+      provider_url = host == 'imagedelivery.net' || host.end_with?('.cloudflareimages.com')
+      if profile.primary_photo_upload_id || ENV['BAILADUO_REQUIRE_MANAGED_PHOTOS'] == 'true' || provider_url
+        raise CloudflareImages::InvalidImage, 'Select a verified photo_upload_id to create or replace the profile photo'
       end
     end
   end

@@ -1,5 +1,6 @@
 ENV["RAILS_ENV"] ||= "test"
 ENV["FRONTEND_ORIGINS"] = "https://frontend.example.test"
+ENV["BAILADUO_REQUIRE_MANAGED_PHOTOS"] = "false"
 require_relative "../config/environment"
 require "rails/test_help"
 

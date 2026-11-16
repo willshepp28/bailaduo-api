@@ -1,9 +1,11 @@
 # BailaDuo — Product Specification
 
-**Version:** 0.1\
+**Version:** 0.2\
 **Status:** Design-ready working specification\
-**Date:** November 15, 2026\
+**Date:** November 16, 2026\
 **Purpose:** Define the MVP user experience for a high-fidelity, clickable mobile-first prototype, then guide implementation. This document distinguishes confirmed product decisions from proposed scope cuts and unresolved implementation details.
+
+**Launch scope update:** API-003 / WEB-003 require one owned primary photo uploaded from the user's phone/computer through Cloudflare Images. Pasted HTTPS URLs are temporary rollout compatibility only. Existing profiles are preserved. Extra galleries and optional Cloudflare Stream clips remain after launch; launch issue #5 owns sequence and release evidence.
 
 ## 1. Product overview
 
@@ -52,7 +54,7 @@ User shares public profile link or branded profile card → Visitor opens a limi
 ### Dancer profile
 **Required at onboarding**
 - Display name.
-- Primary profile photo.
+- One primary profile photo uploaded through Cloudflare Images; verified and owned by the authenticated user before attachment.
 - Age (self-reported; adult-only initial product).
 - City/location (city-level, no precise GPS required).
 - At least one dance style (bachata first; other styles possible).
@@ -67,7 +69,7 @@ User shares public profile link or branded profile card → Visitor opens a limi
 **Behavior**
 - Users must finish required onboarding before appearing in discovery or sending requests.
 - Other dancers can review name, age, city, styles, experience, availability, and shared gallery content before accepting.
-- Users can edit their own profiles and manage their photos.
+- Users can edit their own profiles and replace their primary photo. Failed uploads or profile validation preserve the previous photo. JPEG, PNG and WebP up to 5 MB are supported; upload authorization is available before profile completion. Additional galleries remain deferred.
 - Use the actual provided BailaDuo logo and branding, not a replacement.
 - A profile photo helps identification but is not identity verification.
 - Public link previews should avoid exposing email, messages, precise location, and other private data. Design may give users control over whether age or other optional details appear on externally shared cards.
@@ -168,7 +170,7 @@ All interactions should be clickable in the prototype, with realistic fictional 
 - Hosting: **Netlify frontend**, **Render Free backend** (cold starts acceptable for MVP).
 - Authentication: established Rails auth library; no bespoke auth protocol.
 - Initial conceptual models: `User`, `Profile`, `Connection`, `Message`; add a small `ProfileMedia` association for multiple uploads if implementing gallery management.
-- Media stored with a managed service, not as binaries inside PostgreSQL or ephemeral Render filesystem. Cloudflare is a possible existing service, but exact account/product still needs confirmation.
+- Media stored with a managed service, not as binaries inside PostgreSQL or ephemeral Render filesystem. Cloudflare Images is the confirmed primary-photo provider. Dedicated BailaDuo credentials, variants, owned records and environment checks must protect existing JabNGo media; metadata is not a security boundary.
 - The prototype should be HTML/CSS/JavaScript with **mock state**; the production app must implement authorization and persistence through Rails.
 
 ### Proposed illustrative REST API operations (not a binding final contract)
@@ -187,7 +189,7 @@ Authentication, current-profile management, photo upload authorization, and publ
 ## 12. Scope priorities for fast launch
 
 ### P0 — Must work to validate the product
-- Real registration/login and required profile onboarding.
+- Real registration/login and required profile onboarding with one owned Cloudflare Images photo.
 - City-based discovery and dancer detail.
 - Connection requests and incoming accept/decline.
 - Persistent messaging for accepted connections.
@@ -211,7 +213,7 @@ No followers/following graph, dating or matching swipe system, algorithmic compa
 
 ## 14. Open questions — not blockers for prototype
 
-- Final media provider and upload integration (Cloudflare Images/Stream vs. other managed service).
+- Cloudflare Images is confirmed for the single-photo launch; configure dedicated credentials/variants and verify real uploads. Optional Stream clips are MEDIA-001 post-launch work.
 - Exact age input format and external sharing visibility.
 - Reconnect/retry behavior after a declined or ended relationship.
 - Exact REST payloads, migrations, and Devise integration/version compatibility.

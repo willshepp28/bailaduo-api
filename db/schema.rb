@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2026_11_15_000300) do
+ActiveRecord::Schema[7.1].define(version: 2026_11_16_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -41,6 +41,27 @@ ActiveRecord::Schema[7.1].define(version: 2026_11_15_000300) do
     t.check_constraint "char_length(btrim(body)) >= 1 AND char_length(btrim(body)) <= 5000", name: "messages_valid_body"
   end
 
+  create_table "photo_uploads", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "app", default: "bailaduo", null: false
+    t.string "environment", null: false
+    t.string "provider_account_id", null: false
+    t.string "provider_image_id", null: false
+    t.string "status", default: "issuing", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "verified_at"
+    t.string "delivery_url"
+    t.string "content_type"
+    t.bigint "byte_size"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["provider_account_id", "provider_image_id"], name: "index_photo_uploads_on_provider_identity", unique: true
+    t.index ["user_id", "created_at"], name: "index_photo_uploads_on_user_id_and_created_at"
+    t.index ["user_id"], name: "index_photo_uploads_on_user_id"
+    t.check_constraint "byte_size IS NULL OR byte_size >= 1 AND byte_size <= 5000000", name: "photo_uploads_valid_size"
+    t.check_constraint "status::text = ANY (ARRAY['issuing'::character varying, 'pending'::character varying, 'ready'::character varying, 'attached'::character varying, 'superseded'::character varying, 'failed'::character varying, 'deleted'::character varying]::text[])", name: "photo_uploads_valid_status"
+  end
+
   create_table "profiles", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.string "display_name", null: false
@@ -53,7 +74,9 @@ ActiveRecord::Schema[7.1].define(version: 2026_11_15_000300) do
     t.string "primary_photo_url", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "primary_photo_upload_id"
     t.index "lower((city)::text)", name: "index_profiles_on_lower_city"
+    t.index ["primary_photo_upload_id"], name: "index_profiles_on_primary_photo_upload_id", unique: true
     t.index ["user_id"], name: "index_profiles_on_user_id", unique: true
     t.check_constraint "age >= 18", name: "profiles_adult_age"
   end
@@ -74,5 +97,7 @@ ActiveRecord::Schema[7.1].define(version: 2026_11_15_000300) do
   add_foreign_key "connections", "users", column: "requester_id"
   add_foreign_key "messages", "connections"
   add_foreign_key "messages", "users", column: "sender_id"
+  add_foreign_key "photo_uploads", "users"
+  add_foreign_key "profiles", "photo_uploads", column: "primary_photo_upload_id"
   add_foreign_key "profiles", "users"
 end

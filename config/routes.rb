@@ -12,6 +12,9 @@ Rails.application.routes.draw do
   end
 
   namespace :api do
+    resources :photo_uploads, only: [:create, :show, :destroy] do
+      post :complete, on: :member
+    end
     get 'profile', to: 'profiles#mine'
     post 'profile', to: 'profiles#create'
     patch 'profile', to: 'profiles#update'
