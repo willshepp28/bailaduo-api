@@ -4,7 +4,7 @@ module PhotoHelpers
   SETTINGS = {
     'BAILADUO_CLOUDFLARE_ACCOUNT_ID' => 'testaccount',
     'BAILADUO_CLOUDFLARE_IMAGES_HASH' => 'testhash',
-    'BAILADUO_CLOUDFLARE_IMAGES_VARIANT' => 'bailaduo-test-profile',
+    'BAILADUO_CLOUDFLARE_IMAGES_VARIANT' => 'bailaduotestprofile',
     'BAILADUO_MEDIA_ENVIRONMENT' => 'test',
     'BAILADUO_REQUIRE_MANAGED_PHOTOS' => 'true'
   }.freeze
@@ -46,7 +46,7 @@ module PhotoHelpers
       assert_owned!(upload)
       @verified << upload.id
       raise verification_error if verification_error
-      { delivery_url: "https://imagedelivery.net/testhash/#{upload.provider_image_id}/bailaduo-test-profile",
+      { delivery_url: "https://imagedelivery.net/testhash/#{upload.provider_image_id}/bailaduotestprofile",
         byte_size: 128, content_type: 'image/png' }
     end
 

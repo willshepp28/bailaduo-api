@@ -515,7 +515,7 @@ Only `image/jpeg`, `image/png`, `image/webp` and sizes 1–5,000,000 are accepte
     "status":"ready",
     "expires_at":"2026-11-16T14:10:00.000Z",
     "claim_expires_at":"2026-11-17T14:10:00.000Z",
-    "primary_photo_url":"https://imagedelivery.net/<configured-account-hash>/<server-issued-image-id>/bailaduo-development-profile",
+    "primary_photo_url":"https://imagedelivery.net/<configured-account-hash>/<server-issued-image-id>/bailaduodevelopmentprofile",
     "content_type":"image/png",
     "byte_size":12345
   }

@@ -23,14 +23,14 @@ GitHub Actions runs migrations, the full suite and production autoload on isolat
 
 ## Profile-photo configuration
 
-Keep all credentials in the Rails environment. No `VITE_*` Cloudflare secrets, shared JabNGo token, account-wide cleanup, or changes to existing variants/assets. Create a dedicated BailaDuo Images token with Images read/edit permissions for the intended account, and a new delivery variant such as `bailaduo-development-profile` (800×800, fit cover, no upscaling). Cloudflare Images tokens are account-scoped; Rails ownership/environment checks provide asset isolation, not metadata or token naming.
+Keep all credentials in the Rails environment. No `VITE_*` Cloudflare secrets, shared JabNGo token, account-wide cleanup, or changes to existing variants/assets. Create a dedicated BailaDuo Images token with Images read/edit permissions for the intended account, and a new delivery variant such as `bailaduodevelopmentprofile` (800×800, fit crop, no upscaling, metadata none). Cloudflare Images tokens are account-scoped; Rails ownership/environment checks provide asset isolation, not metadata or token naming.
 
 | Variable | Purpose |
 | --- | --- |
 | `BAILADUO_CLOUDFLARE_ACCOUNT_ID` | Intended Cloudflare account ID |
 | `BAILADUO_CLOUDFLARE_IMAGES_TOKEN` | Dedicated server-only Images API token |
 | `BAILADUO_CLOUDFLARE_IMAGES_HASH` | Delivery account hash from Images delivery URLs |
-| `BAILADUO_CLOUDFLARE_IMAGES_VARIANT` | Existing new BailaDuo variant; must start `bailaduo-<environment>-` |
+| `BAILADUO_CLOUDFLARE_IMAGES_VARIANT` | Existing new BailaDuo variant; must use lowercase letters/digits and start with `bailaduo` plus the media environment with hyphens removed; e.g. `bailaduodevelopmentprofile` |
 | `BAILADUO_MEDIA_ENVIRONMENT` | Asset namespace; defaults to Rails environment; use distinct development/staging/production identities |
 | `BAILADUO_REQUIRE_MANAGED_PHOTOS` | Set exactly `true` after WEB-003 is ready to require owned uploads for new/replaced photos; default is compatibility mode |
 | `FRONTEND_ORIGINS` | Comma-separated exact frontend origins; no wildcard/path/trailing slash |

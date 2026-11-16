@@ -13,6 +13,14 @@ class CloudflareImagesTest < ActiveSupport::TestCase
   end
   teardown { restore_photo_configuration }
 
+  test 'configuration uses provider-compatible alphanumeric environment-specific variant names' do
+    assert_instance_of CloudflareImages, CloudflareImages.new
+    ['bailaduo-test-profile', 'bailaduoproductionprofile', 'public'].each do |variant|
+      ENV['BAILADUO_CLOUDFLARE_IMAGES_VARIANT'] = variant
+      assert_raises(CloudflareImages::NotConfigured) { CloudflareImages.new }
+    end
+  end
+
   def response(data, code: '200')
     klass = code == '404' ? Net::HTTPNotFound : Net::HTTPOK
     response = klass.new('1.1', code, 'test')
@@ -31,7 +39,7 @@ class CloudflareImagesTest < ActiveSupport::TestCase
 
   def details(overrides = {})
     { id: @upload.provider_image_id, uploaded: Time.current.iso8601, requireSignedURLs: false,
-      variants: ["https://imagedelivery.net/testhash/#{@upload.provider_image_id}/bailaduo-test-profile"] }.merge(overrides)
+      variants: ["https://imagedelivery.net/testhash/#{@upload.provider_image_id}/bailaduotestprofile"] }.merge(overrides)
   end
 
   def json_response(result)

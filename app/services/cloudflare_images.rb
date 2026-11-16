@@ -24,7 +24,8 @@ class CloudflareImages
     @environment = self.class.environment
     @variant = required('BAILADUO_CLOUDFLARE_IMAGES_VARIANT')
     unless @account_id.match?(/\A[a-zA-Z0-9]+\z/) && @delivery_hash.match?(/\A[a-zA-Z0-9_-]+\z/) &&
-           @environment.match?(/\A[a-z0-9-]+\z/) && @variant.match?(/\Abailaduo-#{Regexp.escape(@environment)}-[a-z0-9-]+\z/)
+           @environment.match?(/\A[a-z0-9-]+\z/) && @variant.length <= 99 &&
+           @variant.match?(/\Abailaduo#{Regexp.escape(@environment.delete('-'))}[a-z0-9]+\z/)
       raise NotConfigured, 'BailaDuo Images configuration is invalid'
     end
   end
