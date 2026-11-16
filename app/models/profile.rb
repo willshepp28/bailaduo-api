@@ -3,7 +3,9 @@ class Profile < ApplicationRecord
   PUBLIC_FIELDS = %i[id display_name age city dance_styles experience_level availability bio primary_photo_url].freeze
 
   belongs_to :user
+  belongs_to :primary_photo_upload, class_name: 'PhotoUpload', optional: true
   before_validation :normalize_fields
+  after_update_commit :retire_previous_photo
 
   validates :user_id, uniqueness: true
   validates :display_name, :city, :availability, :primary_photo_url, presence: true
@@ -15,6 +17,7 @@ class Profile < ApplicationRecord
   validates :experience_level, inclusion: { in: EXPERIENCE_LEVELS }
   validates :dance_styles, presence: true, length: { maximum: 10 }
   validate :valid_dance_styles
+  validate :valid_managed_photo
 
   # Required fields also checked at query time to hide legacy/imported incomplete rows.
   scope :complete, -> {
@@ -30,6 +33,22 @@ class Profile < ApplicationRecord
   end
 
   private
+
+  def valid_managed_photo
+    return unless primary_photo_upload
+    CloudflareImages.new.assert_owned!(primary_photo_upload)
+    unless primary_photo_upload.user_id == user_id && %w[ready attached].include?(primary_photo_upload.status) &&
+           primary_photo_upload.verified_at && primary_photo_upload.delivery_url == primary_photo_url
+      errors.add(:primary_photo_upload, 'must be a verified photo owned by this dancer')
+    end
+  end
+
+  def retire_previous_photo
+    old_id = saved_change_to_primary_photo_upload_id&.first
+    PhotoUpload.find(old_id).retire! if old_id
+  rescue CloudflareImages::Error
+    Rails.logger.warn('BailaDuo photo cleanup deferred; run photos:cleanup after restoring provider configuration')
+  end
 
   def normalize_fields
     %i[display_name city availability bio primary_photo_url].each do |field|

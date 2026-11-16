@@ -5,6 +5,7 @@ class User < ApplicationRecord
   include DeviseTokenAuth::Concerns::User
 
   has_one :profile, dependent: :destroy
+  has_many :photo_uploads, dependent: :restrict_with_exception
   validate :password_byte_limit
 
   def valid_password?(candidate)
