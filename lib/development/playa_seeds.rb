@@ -88,6 +88,18 @@ module Development
       end
     end
 
+    def existing_cohort!
+      verify_database!
+      verify_private_path!
+      manifest = read_manifest || raise(Refused, 'Create the private seed cohort before refreshing portraits')
+      manifest.fetch('users').each do |entry|
+        user = owned_user(entry)
+        unless user && user.profile&.id == entry['profile_id']
+          raise Refused, 'Portrait refresh requires the existing owned accounts and profiles; run seed_playa to restore missing records'
+        end
+      end
+    end
+
     private
 
     def verify_private_path!
